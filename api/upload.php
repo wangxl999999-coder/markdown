@@ -6,6 +6,52 @@ header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../config/autoload.php';
 
+/**
+ * 获取文件扩展名 - 兼容多种方法
+ * @param string $filePath 临时文件路径
+ * @param string $originalName 原始文件名
+ * @return string 扩展名（包含点）
+ */
+function getFileExtension($filePath, $originalName = '') {
+    $mimeToExt = [
+        'image/jpeg' => '.jpg',
+        'image/png' => '.png',
+        'image/gif' => '.gif',
+        'image/webp' => '.webp'
+    ];
+    
+    // 方法1：使用 getimagesize（比 exif 更普遍支持）
+    if (function_exists('getimagesize')) {
+        $imageInfo = @getimagesize($filePath);
+        if ($imageInfo && isset($imageInfo[2])) {
+            $ext = image_type_to_extension($imageInfo[2]);
+            if ($ext) {
+                return $ext;
+            }
+        }
+    }
+    
+    // 方法2：使用 Finfo
+    if (class_exists('Finfo')) {
+        $finfo = new Finfo(FILEINFO_MIME_TYPE);
+        $mime = $finfo->file($filePath);
+        if (isset($mimeToExt[$mime])) {
+            return $mimeToExt[$mime];
+        }
+    }
+    
+    // 方法3：从原始文件名获取
+    if ($originalName) {
+        $ext = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
+        if ($ext) {
+            return '.' . $ext;
+        }
+    }
+    
+    // 默认返回 .jpg
+    return '.jpg';
+}
+
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
         throw new Exception('请求方法错误');
@@ -43,8 +89,8 @@ try {
         throw new Exception('只支持上传JPG、PNG、GIF、WEBP格式的图片');
     }
     
-    // 生成文件名
-    $extension = image_type_to_extension(exif_imagetype($file['tmp_name']));
+    // 生成文件名 - 使用更兼容的方式获取扩展名
+    $extension = getFileExtension($file['tmp_name'], $file['name']);
     $filename = date('YmdHis') . '_' . uniqid() . $extension;
     
     // 按月分目录存储
