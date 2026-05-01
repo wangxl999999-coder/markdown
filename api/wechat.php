@@ -170,8 +170,37 @@ class WechatAPI {
     }
 }
 
+/**
+ * 解析输入数据 - 同时支持 JSON 和表单提交
+ * @return array
+ */
+function parseInputData() {
+    $data = [];
+    
+    // 首先合并表单数据
+    if (!empty($_POST)) {
+        $data = array_merge($data, $_POST);
+    }
+    
+    // 然后解析 JSON 数据（php://input 只能读取一次）
+    $input = file_get_contents('php://input');
+    if ($input !== false && !empty($input)) {
+        $jsonData = json_decode($input, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($jsonData)) {
+            $data = array_merge($data, $jsonData);
+        }
+    }
+    
+    return $data;
+}
+
 // 处理请求
 try {
+    // 检查 curl 扩展
+    if (!extension_loaded('curl')) {
+        throw new Exception('需要启用 curl 扩展才能使用微信公众号功能');
+    }
+    
     $wechat = new WechatAPI();
     
     $action = $_GET['action'] ?? '';
@@ -183,7 +212,7 @@ try {
             break;
             
         case 'publish':
-            $input = json_decode(file_get_contents('php://input'), true);
+            $input = parseInputData();
             
             if (!isset($input['content'])) {
                 throw new Exception('缺少内容参数');
